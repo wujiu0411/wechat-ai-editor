@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from app.core.wechat_api import wechat, sync_article_to_draft
+from app.models.database import record_sync
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
@@ -8,6 +10,7 @@ router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 class SyncRequest(BaseModel):
     title: str
     html_output: str
+    history_id: Optional[int] = None
 
 
 @router.get("/status")
@@ -32,8 +35,9 @@ async def sync_to_wechat(req: SyncRequest):
         result = await sync_article_to_draft(
             title=req.title,
             html_content=req.html_output,
-            image_mapping={},
         )
+        if req.history_id:
+            await record_sync(req.history_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

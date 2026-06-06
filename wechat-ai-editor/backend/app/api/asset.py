@@ -1,12 +1,15 @@
 import os
+import io
 import uuid
 import aiofiles
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from pydantic import BaseModel
+from PIL import Image as PILImage
 from app.models.database import search_assets, upsert_asset, delete_asset
+from app.core.config import settings
 from app.core.asset_indexer import init_app
 from app.models.schemas import AssetItem
-from pathlib import Path
-from app.core.config import settings
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
@@ -25,10 +28,105 @@ async def list_assets(
     query: str = "",
     category: str = "",
     sub_category: str = "",
+    file_type: str = "",
 ):
     await ensure_init()
-    results = await search_assets(query=query, category=category, sub_category=sub_category)
+    results = await search_assets(query=query, category=category, sub_category=sub_category, file_type=file_type)
     return {"total": len(results), "items": results}
+
+
+class SplitRequest(BaseModel):
+    seg_heights: list[int] = []
+
+
+@router.post("/{asset_id}/split-long")
+async def split_long_image(asset_id: int, req: SplitRequest = SplitRequest()):
+    """将长图按指定高度裁剪为多个片段。seg_heights为空则自动分割。"""
+    await ensure_init()
+    from app.models.database import get_asset_by_id
+
+    asset = await get_asset_by_id(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="素材不存在")
+
+    file_path = None
+    for base_dir in [Path(settings.UPLOAD_DIR), Path(settings.ASSETS_DIR)]:
+        p = base_dir / asset["filepath"]
+        if p.exists():
+            file_path = p
+            break
+
+    if not file_path:
+        raise HTTPException(status_code=404, detail="素材文件不存在")
+
+    img = PILImage.open(file_path)
+    w, h = img.size
+
+    base_name = Path(asset["filename"]).stem
+    upload_dir = Path(settings.UPLOAD_DIR) / "长图裁剪"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use custom segment heights or auto-split
+    heights = req.seg_heights if req.seg_heights else [int(w * 2)] * min(10, max(2, h // (w * 2)))
+
+    segments = []
+    y = 0
+    overlap = 0
+    for seg_num, seg_h in enumerate(heights[:10], 1):
+        if y >= h:
+            break
+        bottom = min(y + seg_h, h)
+        crop = img.crop((0, y, w, bottom))
+
+        buf = io.BytesIO()
+        crop.save(buf, format='JPEG', quality=90, optimize=True)
+        seg_data = buf.getvalue()
+
+        seg_name = f"{base_name}_第{seg_num}段.jpg"
+        seg_path = upload_dir / seg_name
+        with open(seg_path, "wb") as f:
+            f.write(seg_data)
+
+        rel_path = str(seg_path.relative_to(Path(settings.UPLOAD_DIR))).replace("\\", "/")
+
+        await upsert_asset({
+            "filename": seg_name,
+            "filepath": rel_path,
+            "category": asset["category"],
+            "sub_category": asset.get("sub_category"),
+            "keywords": f"{asset.get('keywords', '')},长图裁剪{seg_num}",
+            "file_size": len(seg_data),
+            "file_type": "image",
+        })
+
+        segments.append({"filename": seg_name, "filepath": rel_path, "size": len(seg_data)})
+        y += seg_h - overlap
+
+    # Trigger rebuild of image descriptions and knowledge base
+    import asyncio
+    asyncio.create_task(_rebuild_indexes_async())
+
+    return {"message": f"已将长图裁剪为{len(segments)}段，AI正在学习新素材...", "segments": segments}
+
+
+async def _rebuild_indexes_async():
+    """后台重建图片描述索引和知识库"""
+    try:
+        from app.core.image_descriptor import build_image_descriptions, build_vector_index
+        descs = await build_image_descriptions()
+        if descs:
+            build_vector_index(descs)
+        from app.core.knowledge_base import build_knowledge_base
+        build_knowledge_base()
+        print("Indexes rebuilt after image split")
+    except Exception as e:
+        print(f"Index rebuild error: {e}")
+
+
+@router.get("/description-status")
+async def get_description_status():
+    from app.core.image_descriptor import get_build_progress
+    return get_build_progress()
 
 
 @router.get("/categories")
@@ -78,8 +176,8 @@ async def upload_asset(
     await ensure_init()
 
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".mp4", ".pdf"}:
-        raise HTTPException(status_code=400, detail=f"不支持的文件格式: {ext}")
+    if ext not in {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}:
+        raise HTTPException(status_code=400, detail=f"不支持的文件格式: {ext}，仅支持图片")
 
     content = await file.read()
     file_size = len(content)
@@ -140,14 +238,18 @@ async def update_asset(
 @router.delete("/{asset_id}")
 async def remove_asset(asset_id: int):
     await ensure_init()
-    from app.models.database import get_asset_by_id, delete_asset
+    from app.models.database import get_asset_by_id, delete_asset, mark_filepath_deleted
     asset = await get_asset_by_id(asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="素材不存在")
 
+    # Only delete physical file if it's in uploads (not source assets)
     file_path = Path(settings.UPLOAD_DIR) / asset["filepath"]
     if file_path.exists():
         os.remove(file_path)
+
+    # Track deleted filepath to prevent re-scan
+    await mark_filepath_deleted(asset["filepath"])
 
     await delete_asset(asset_id)
     return {"message": "已删除"}

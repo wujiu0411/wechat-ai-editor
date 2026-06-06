@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from app.models.database import (
     get_history_list,
     get_history_by_id,
     delete_history,
+    update_history,
 )
 from app.core.asset_indexer import init_app
 import json
@@ -54,6 +57,33 @@ async def get_history(item_id: int):
         item["quality_report"] = json.loads(item["quality_report"])
 
     return item
+
+
+class HistoryUpdate(BaseModel):
+    article_title: Optional[str] = None
+    article_content_markdown: Optional[str] = None
+    html_output: Optional[str] = None
+
+
+@router.put("/{item_id}")
+async def edit_history(item_id: int, data: HistoryUpdate):
+    await ensure_init()
+    existing = await get_history_by_id(item_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="记录不存在")
+
+    updates = {}
+    if data.article_title is not None:
+        updates["article_title"] = data.article_title
+    if data.article_content_markdown is not None:
+        updates["article_content_markdown"] = data.article_content_markdown
+    if data.html_output is not None:
+        updates["html_output"] = data.html_output
+
+    if updates:
+        await update_history(item_id, updates)
+
+    return {"message": "更新成功"}
 
 
 @router.delete("/{item_id}")

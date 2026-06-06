@@ -49,6 +49,7 @@ class ImageInfo(BaseModel):
 
 
 class ArticleOutput(BaseModel):
+    history_id: Optional[int] = Field(None, description="历史记录ID")
     article_title: str = Field(..., description="文章标题")
     article_content_markdown: str = Field(..., description="Markdown格式正文")
     html_output: str = Field(..., description="已排版HTML")

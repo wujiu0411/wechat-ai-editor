@@ -43,6 +43,8 @@ async def init_db():
                 seo_keywords TEXT DEFAULT '[]',
                 template_id TEXT DEFAULT 'tech_pro',
                 quality_report TEXT,
+                sync_count INTEGER DEFAULT 0,
+                last_synced_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -55,10 +57,27 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category);
             CREATE INDEX IF NOT EXISTS idx_assets_keywords ON assets(keywords);
             CREATE INDEX IF NOT EXISTS idx_assets_sub_category ON assets(sub_category);
+            CREATE TABLE IF NOT EXISTS deleted_assets (
+                filepath TEXT PRIMARY KEY,
+                deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_history_content_type ON history(content_type);
             CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at);
         """)
         await db.commit()
+
+        # Migration: add sync_count and last_synced_at for existing databases
+        try:
+            await db.execute("ALTER TABLE history ADD COLUMN sync_count INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE history ADD COLUMN last_synced_at TIMESTAMP")
+            await db.commit()
+        except Exception:
+            pass
     finally:
         await db.close()
 
@@ -114,6 +133,31 @@ async def get_history_by_id(item_id: int):
         await db.close()
 
 
+async def update_history(item_id: int, updates: dict):
+    db = await get_db()
+    try:
+        for key, value in updates.items():
+            await db.execute(
+                f"UPDATE history SET {key} = ? WHERE id = ?",
+                (value, item_id),
+            )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def record_sync(item_id: int):
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE history SET sync_count = sync_count + 1, last_synced_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (item_id,),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
 async def delete_history(item_id: int):
     db = await get_db()
     try:
@@ -163,7 +207,7 @@ async def upsert_asset(asset: dict):
         await db.close()
 
 
-async def search_assets(query: str = "", category: str = "", sub_category: str = ""):
+async def search_assets(query: str = "", category: str = "", sub_category: str = "", file_type: str = ""):
     db = await get_db()
     try:
         conditions = []
@@ -177,6 +221,9 @@ async def search_assets(query: str = "", category: str = "", sub_category: str =
         if sub_category:
             conditions.append("sub_category = ?")
             params.append(sub_category)
+        if file_type:
+            conditions.append("file_type = ?")
+            params.append(file_type)
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         cursor = await db.execute(
             f"SELECT * FROM assets WHERE {where_clause} ORDER BY category, filename",
@@ -184,6 +231,24 @@ async def search_assets(query: str = "", category: str = "", sub_category: str =
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def mark_filepath_deleted(filepath: str):
+    db = await get_db()
+    try:
+        await db.execute("INSERT OR REPLACE INTO deleted_assets (filepath) VALUES (?)", (filepath,))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def is_filepath_deleted(filepath: str) -> bool:
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT 1 FROM deleted_assets WHERE filepath = ?", (filepath,))
+        return (await cursor.fetchone()) is not None
     finally:
         await db.close()
 

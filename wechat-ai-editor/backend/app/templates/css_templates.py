@@ -18,13 +18,13 @@ TECH_PRO_CSS = """
 TECH_PRO_STYLES = {
     "h2": "font-size:18px;font-weight:700;color:#0066CC;margin:28px 0 12px 0;padding-bottom:8px;border-bottom:2px solid #E6F0FA;display:flex;align-items:center;",
     "h3": "font-size:16px;font-weight:600;color:#1A1A1A;margin:20px 0 10px 0;padding-left:10px;border-left:3px solid #0066CC;",
-    "p": "font-size:15px;color:#333;line-height:1.75;margin:10px 0;text-align:justify;letter-spacing:0.5px;",
+    "p": "font-size:15px;color:#333;line-height:1.85;margin:12px 0;text-align:justify;letter-spacing:0.5px;text-indent:2em;",
     "strong": "color:#0066CC;font-weight:600;",
     "ul": "margin:10px 0;padding-left:20px;list-style:none;",
     "li": "font-size:15px;color:#333;line-height:1.8;margin:6px 0;padding-left:12px;position:relative;",
-    "blockquote": "margin:16px 0;padding:12px 16px;background:#F0F7FF;border-left:4px solid #0066CC;border-radius:0 6px 6px 0;font-size:14px;color:#555;",
-    "img": "max-width:100%;height:auto;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.08);display:block;margin:16px auto;",
-    "hr": "border:none;height:1px;background:linear-gradient(to right,transparent,#0066CC,transparent);margin:24px 0;",
+    "blockquote": "margin:16px 0;padding:12px 16px;background:#F0F7FF;border-left:4px solid #0066CC;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.7;",
+    "img": "max-width:100%;height:auto;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.08);display:block;margin:20px auto;",
+    "hr": "border:none;height:1px;background:linear-gradient(to right,transparent,#0066CC,transparent);margin:28px 0;",
 }
 
 
@@ -47,7 +47,7 @@ FESTIVAL_CSS = """
 FESTIVAL_STYLES = {
     "h2": "font-size:18px;font-weight:700;color:#FF2E63;margin:28px 0 12px 0;padding-bottom:8px;border-bottom:2px solid #FFE0E8;",
     "h3": "font-size:16px;font-weight:600;color:#1A1A1A;margin:20px 0 10px 0;padding-left:10px;border-left:3px solid #FF6B35;",
-    "p": "font-size:15px;color:#333;line-height:1.75;margin:10px 0;text-align:justify;letter-spacing:0.5px;",
+    "p": "font-size:15px;color:#333;line-height:1.85;margin:12px 0;text-align:justify;letter-spacing:0.5px;text-indent:2em;",
     "strong": "color:#FF2E63;font-weight:600;",
     "ul": "margin:10px 0;padding-left:20px;",
     "li": "font-size:15px;color:#333;line-height:1.8;margin:6px 0;",
@@ -77,7 +77,7 @@ SCIENCE_CSS = """
 SCIENCE_STYLES = {
     "h2": "font-size:18px;font-weight:700;color:#2E7D32;margin:28px 0 12px 0;padding-bottom:8px;border-bottom:2px solid #E8F5E9;",
     "h3": "font-size:16px;font-weight:600;color:#1A1A1A;margin:20px 0 10px 0;padding-left:10px;border-left:3px solid #4CAF50;",
-    "p": "font-size:15px;color:#333;line-height:1.75;margin:10px 0;text-align:justify;letter-spacing:0.5px;",
+    "p": "font-size:15px;color:#333;line-height:1.85;margin:12px 0;text-align:justify;letter-spacing:0.5px;text-indent:2em;",
     "strong": "color:#2E7D32;font-weight:600;",
     "ul": "margin:10px 0;padding-left:20px;",
     "li": "font-size:15px;color:#333;line-height:1.8;margin:6px 0;",

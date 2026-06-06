@@ -56,11 +56,15 @@ async def quality_check(
 
     passed = len(issues) == 0
 
+    # LLM self-evaluation (lightweight)
+    self_review = await _llm_self_review(title, content)
+
     return {
         "passed": passed,
         "score": score,
         "issues": issues,
         "warnings": warnings,
+        "self_review": self_review,
         "word_count": word_count,
         "image_count": len(valid_images),
         "missing_image_count": len(missing_images),
@@ -100,6 +104,41 @@ def _find_words(text: str, words: list[str]) -> list[str]:
         if w in text:
             found.append(w)
     return found
+
+
+async def _llm_self_review(title: str, content: str) -> dict:
+    """LLM self-evaluates its own output for quality."""
+    try:
+        from app.core.llm import get_llm
+        from langchain_core.messages import SystemMessage, HumanMessage
+
+        prompt = f"""请评价这篇公众号文章的质量。仅输出JSON，不做额外解释。
+
+标题：{title[:60]}
+内容前500字：{content[:500]}
+
+评分维度（每项1-10分）：
+- 标题吸引力：是否吸引点击
+- 内容完整性：是否覆盖关键信息
+- 品牌调性：是否符合专业科技感
+- 可读性：排版和段落节奏
+
+```json
+{{"title_appeal": 7, "content_completeness": 7, "brand_tone": 7, "readability": 7, "overall": 7, "suggestion": "一句话改进建议"}}
+```"""
+        llm = get_llm(temperature=0.2, max_tokens=150)
+        messages = [SystemMessage(content="你是内容质量评审专家。"), HumanMessage(content=prompt)]
+        response = await llm.ainvoke(messages)
+        resp_text = response.content.strip()
+
+        import json, re
+        json_match = re.search(r'\{[^}]*\}', resp_text)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception:
+        pass
+
+    return {"overall": 7, "suggestion": "暂无评价"}
 
 
 def _strip_markdown(text: str) -> str:

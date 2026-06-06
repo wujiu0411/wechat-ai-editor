@@ -11,22 +11,37 @@ const api = axios.create({
 
 export const articleApi = {
   generate(data) {
-    return api.post('/article/generate', data)
+    return api.post('/article/generate-v2', data)
+  },
+  generateFromImages(data) {
+    return api.post('/article/generate-from-images', data)
   },
   reformat(data) {
-    return api.post('/article/reformat', null, { params: data })
+    return api.post('/article/reformat', data)
   },
   refreshAssets() {
     return api.post('/article/refresh-assets')
   },
+  suggestions(params = {}) {
+    return api.get('/article/suggestions', { params })
+  },
+  batchGenerate(data) {
+    return api.post('/article/batch-generate', data)
+  },
+  generateFromSuggestion(data) {
+    return api.post('/article/generate-from-suggestion', data)
+  },
 }
 
 export const assetApi = {
-  list(params) {
-    return api.get('/assets/list', { params })
+  list(params = {}) {
+    return api.get('/assets/list', { params: { ...params, file_type: params.file_type || 'image' } })
   },
   categories() {
     return api.get('/assets/categories')
+  },
+  descriptionStatus() {
+    return api.get('/assets/description-status')
   },
   upload(file, { category, sub_category, keywords }) {
     const formData = new FormData()
@@ -50,6 +65,9 @@ export const assetApi = {
   delete(id) {
     return api.delete(`/assets/${id}`)
   },
+  splitLong(id, data = {}) {
+    return api.post(`/assets/${id}/split-long`, data)
+  },
 }
 
 export const historyApi = {
@@ -58,6 +76,9 @@ export const historyApi = {
   },
   get(id) {
     return api.get(`/history/${id}`)
+  },
+  update(id, data) {
+    return api.put(`/history/${id}`, data)
   },
   delete(id) {
     return api.delete(`/history/${id}`)

@@ -17,6 +17,10 @@
           <el-icon><EditPen /></el-icon>
           <span>创建文章</span>
         </el-menu-item>
+        <el-menu-item index="/suggestions">
+          <el-icon><Opportunity /></el-icon>
+          <span>选题建议</span>
+        </el-menu-item>
         <el-menu-item index="/assets">
           <el-icon><Picture /></el-icon>
           <span>素材库</span>

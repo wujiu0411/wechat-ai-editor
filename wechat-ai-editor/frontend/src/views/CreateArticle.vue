@@ -6,10 +6,18 @@
           <template #header>
             <div class="card-header">
               <span>文章参数设置</span>
-              <el-tag type="info" size="small">朴道水汇</el-tag>
+              <div style="display:flex;align-items:center;gap:8px">
+                <el-radio-group v-model="createMode" size="small">
+                  <el-radio-button value="form">参数填表</el-radio-button>
+                  <el-radio-button value="image">选图创作</el-radio-button>
+                </el-radio-group>
+                <el-tag type="info" size="small">朴道水汇</el-tag>
+              </div>
             </div>
           </template>
-          <el-form :model="form" label-width="100px" label-position="top" size="default">
+
+          <!-- Form-based creation mode -->
+          <el-form v-if="createMode === 'form'" :model="form" label-width="100px" label-position="top" size="default">
             <el-form-item label="内容类型" required>
               <el-select v-model="form.content_type" placeholder="选择内容类型" style="width:100%">
                 <el-option label="新品上市" value="新品上市" />
@@ -147,12 +155,92 @@
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="handleGenerate" :loading="generating" style="width:100%">
-                <el-icon v-if="!generating"><MagicStick /></el-icon>
-                {{ generating ? '正在生成中...' : '生成文章' }}
-              </el-button>
+              <div style="display:flex;gap:8px">
+                <el-button type="primary" @click="handleGenerate" :loading="generating" style="flex:1">
+                  <el-icon v-if="!generating"><MagicStick /></el-icon>
+                  {{ generating ? '正在生成中...' : '生成文章' }}
+                </el-button>
+                <el-button @click="saveDraft">
+                  <el-icon><FolderChecked /></el-icon> 保存草稿
+                </el-button>
+                <el-badge :value="drafts.length" :hidden="!drafts.length">
+                  <el-button @click="draftListVisible = true">
+                    <el-icon><List /></el-icon> 草稿箱
+                  </el-button>
+                </el-badge>
+              </div>
             </el-form-item>
           </el-form>
+
+          <!-- Image-based creation mode -->
+          <div v-if="createMode === 'image'" style="padding:0">
+            <p style="font-size:13px;color:#666;margin-bottom:12px">选择几张宣传图，AI自动理解图片内容并撰写文章</p>
+
+            <div v-if="!imageModeSelected.length" style="margin-bottom:12px">
+              <el-input v-model="imageModeSearch" placeholder="搜索素材..." clearable size="small">
+                <template #prefix><el-icon><Search /></el-icon></template>
+              </el-input>
+            </div>
+
+            <div style="max-height:350px;overflow-y:auto;margin-bottom:12px">
+              <el-row :gutter="6">
+                <el-col v-for="asset in filteredImageAssets" :key="asset.id" :span="8" style="margin-bottom:6px">
+                  <div class="image-mode-item" :class="{ selected: imageModeSelected.includes(asset.filepath) }">
+                    <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`"
+                         style="width:100%;height:80px;object-fit:cover;border-radius:4px;cursor:pointer"
+                         @click="previewImageAsset(asset)" />
+                    <div class="image-mode-overlay" @click.stop="toggleImageSelect(asset.filepath)">
+                      <el-icon v-if="imageModeSelected.includes(asset.filepath)" color="#0066CC" :size="18">
+                        <CircleCheckFilled />
+                      </el-icon>
+                      <el-icon v-else color="#aaa" :size="18"><CirclePlus /></el-icon>
+                    </div>
+                    <p style="font-size:10px;color:#666;margin:2px 0 0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      {{ asset.filename }}
+                    </p>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+
+            <div v-if="imageModeSelected.length" style="margin-bottom:12px">
+              <el-tag v-for="fp in imageModeSelected" :key="fp" closable @close="toggleImageSelect(fp)" size="small" style="margin:0 4px 4px 0">
+                {{ fp.split('/').pop() }}
+              </el-tag>
+            </div>
+
+            <el-form label-width="80px" label-position="top" size="default">
+              <el-form-item label="语气风格">
+                <el-select v-model="imageModeTone" style="width:100%">
+                  <el-option label="专业、科技感" value="专业、科技感" />
+                  <el-option label="活泼、促销感" value="活泼、促销感" />
+                  <el-option label="科普、亲和" value="科普、亲和" />
+                  <el-option label="商务、严谨" value="商务、严谨" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="主题提示（可选）">
+                <el-input v-model="imageModeTopic" placeholder="如：针对企业客户的商务饮水方案" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleGenerateFromImages" :loading="generating" style="width:100%"
+                           :disabled="!imageModeSelected.length">
+                  <el-icon v-if="!generating"><MagicStick /></el-icon>
+                  {{ generating ? '正在生成中...' : '根据选图生成文章' }}
+                </el-button>
+              </el-form-item>
+            </el-form>
+
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <el-button @click="saveDraft" size="small">
+                <el-icon><FolderChecked /></el-icon> 保存草稿
+              </el-button>
+              <el-badge :value="drafts.length" :hidden="!drafts.length">
+                <el-button @click="draftListVisible = true" size="small">
+                  <el-icon><List /></el-icon> 草稿箱
+                </el-button>
+              </el-badge>
+            </div>
+          </div>
         </el-card>
       </el-col>
 
@@ -166,7 +254,13 @@
             <div style="text-align:center;padding:60px 0">
               <el-icon class="is-loading" :size="48" color="#0066CC"><Loading /></el-icon>
               <p style="margin-top:16px;color:#666">AI正在创作中，请稍候...</p>
-              <p style="color:#999;font-size:13px">预计需要30-60秒</p>
+              <p style="color:#0066CC;font-size:24px;font-weight:700;margin:8px 0">{{ elapsedSeconds }}s</p>
+              <div style="display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:8px">
+                <el-tag :type="genStage === 'planning' ? 'warning' : 'info'" size="small" effect="plain">📋 规划文章结构</el-tag>
+                <el-tag :type="genStage === 'drafting' ? 'warning' : 'info'" size="small" effect="plain">✍️ 逐段撰写内容</el-tag>
+                <el-tag :type="genStage === 'polishing' ? 'warning' : 'info'" size="small" effect="plain">✨ 润色排版优化</el-tag>
+              </div>
+              <p style="color:#999;font-size:13px;margin-top:8px">预计需要40-90秒</p>
             </div>
           </el-card>
         </div>
@@ -182,6 +276,9 @@
                   </el-button>
                   <el-button size="small" @click="copyMarkdown">
                     <el-icon><DocumentCopy /></el-icon> 复制Markdown
+                  </el-button>
+                  <el-button size="small" type="success" @click="openVisualEditor">
+                    <el-icon><Edit /></el-icon> 可视化编辑
                   </el-button>
                   <el-button
                     size="small"
@@ -242,16 +339,122 @@
             </div>
             <p style="margin-top:8px;color:#666;font-size:13px">CTA: {{ result.call_to_action }}</p>
           </el-card>
+
+          <el-card v-if="result.images?.length" class="image-card" style="margin-top:12px">
+            <template #header>
+              <span>文章配图 ({{ result.images.length }}张)</span>
+              <span style="font-size:12px;color:#999;margin-left:8px">可点击替换</span>
+            </template>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div v-for="(img, idx) in result.images" :key="img.source + idx"
+                   class="image-slot"
+                   :class="{ dragging: dragIndex === idx }"
+                   draggable="true"
+                   @dragstart="onDragStart($event, idx)"
+                   @dragover.prevent="onDragOver($event, idx)"
+                   @drop.prevent="onDrop($event, idx)"
+                   @dragend="onDragEnd">
+                <div class="drag-handle" title="拖拽排序">⠿</div>
+                <img v-if="!img.source?.startsWith('[缺失')"
+                     :src="img.source"
+                     style="width:120px;height:90px;object-fit:cover;border-radius:6px"
+                     @click="openImagePicker(idx)"
+                     title="点击替换图片" />
+                <div v-else @click="openImagePicker(idx)" style="width:120px;height:90px;border:2px dashed #ddd;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#999;font-size:12px;text-align:center">
+                  {{ img.alt_text || '缺失' }}
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                  <p style="font-size:10px;color:#999;margin:0;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ img.filename || img.alt_text }}</p>
+                  <span style="font-size:10px;color:#0066CC;font-weight:600">#{{ idx + 1 }}</span>
+                </div>
+              </div>
+            </div>
+          </el-card>
         </div>
       </el-col>
     </el-row>
+
+    <!-- Draft List Dialog -->
+    <el-dialog v-model="draftListVisible" title="草稿箱" width="600px" destroy-on-close>
+      <el-empty v-if="!drafts.length" description="暂无草稿" />
+      <el-table v-else :data="drafts" stripe style="width:100%" max-height="400">
+        <el-table-column label="草稿名称" min-width="180">
+          <template #default="{ row }">
+            <span style="font-weight:500">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="内容类型" width="100">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.data?.content_type || '-' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="保存时间" width="150">
+          <template #default="{ row }">
+            <span style="font-size:12px;color:#999">{{ row.savedAt }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120">
+          <template #default="{ row, $index }">
+            <el-button size="small" @click="loadDraft($index)">加载</el-button>
+            <el-button size="small" type="danger" @click="removeDraft($index)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="draftListVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Image Preview Dialog (for creation mode) -->
+    <el-dialog v-model="imagePreviewVisible" title="图片预览" width="500px" destroy-on-close>
+      <div v-if="imagePreviewAsset" style="max-height:65vh;overflow-y:auto;text-align:center">
+        <img :src="`/api/assets/serve/${imagePreviewAsset.filepath}`"
+             style="max-width:100%;display:block" />
+        <el-descriptions :column="1" border size="small" style="margin-top:12px">
+          <el-descriptions-item label="文件名">{{ imagePreviewAsset.filename }}</el-descriptions-item>
+          <el-descriptions-item label="分类">{{ imagePreviewAsset.category }}</el-descriptions-item>
+          <el-descriptions-item label="关键词">{{ imagePreviewAsset.keywords || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <el-button @click="toggleImageSelect(imagePreviewAsset.filepath)"
+                   :type="imageModeSelected.includes(imagePreviewAsset.filepath) ? 'warning' : 'primary'">
+          {{ imageModeSelected.includes(imagePreviewAsset.filepath) ? '取消选择' : '选用此图' }}
+        </el-button>
+        <el-button @click="imagePreviewVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Image Picker Dialog -->
+    <el-dialog v-model="pickerVisible" title="选择替换图片" width="750px" destroy-on-close>
+      <el-input v-model="pickerSearch" placeholder="搜索素材" style="margin-bottom:12px" clearable>
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
+      <div style="max-height:400px;overflow-y:auto">
+        <el-row :gutter="8">
+          <el-col v-for="asset in filteredPickerAssets" :key="asset.id" :span="6" style="margin-bottom:8px">
+            <div class="picker-item" :class="{ selected: pickerSelected === asset.id }" @click="pickerSelected = asset.id">
+              <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`" style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
+              <div v-else style="width:100%;height:100px;background:#f5f5f5;border-radius:4px;display:flex;align-items:center;justify-content:center">
+                <el-icon :size="32" color="#ccc"><Document /></el-icon>
+              </div>
+              <p style="font-size:11px;color:#666;margin-top:2px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ asset.filename }}</p>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+      <template #footer>
+        <el-button @click="pickerVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmReplaceImage" :disabled="!pickerSelected">确认替换</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { articleApi, templateApi, wechatApi } from '../api'
+import { articleApi, templateApi, wechatApi, assetApi } from '../api'
 
 const form = ref({
   content_type: '新品上市',
@@ -288,6 +491,314 @@ const activeTab = ref('preview')
 const previewFrame = ref(null)
 const templates = ref([])
 const syncStatus = ref('idle')
+const elapsedSeconds = ref(0)
+const genStage = ref('planning')
+let elapsedTimer = null
+
+// Image-based creation mode
+const createMode = ref('form')
+const imageModeSelected = ref([])
+const imageModeSearch = ref('')
+const imageModeTone = ref('专业、科技感')
+const imageModeTopic = ref('')
+const imageModeAssets = ref([])
+
+const filteredImageAssets = computed(() => {
+  const q = imageModeSearch.value.toLowerCase()
+  const assets = imageModeAssets.value.filter(a => a.file_type === 'image')
+  if (!q) return assets
+  return assets.filter(a =>
+    a.filename.toLowerCase().includes(q) ||
+    (a.keywords || '').toLowerCase().includes(q) ||
+    a.category.toLowerCase().includes(q)
+  )
+})
+
+async function loadImageAssets() {
+  if (imageModeAssets.value.length) return
+  try {
+    const { data } = await assetApi.list({})
+    imageModeAssets.value = data.items || []
+  } catch {}
+}
+
+const imagePreviewVisible = ref(false)
+const imagePreviewAsset = ref(null)
+
+function previewImageAsset(asset) {
+  imagePreviewAsset.value = asset
+  imagePreviewVisible.value = true
+}
+
+function toggleImageSelect(filepath) {
+  const idx = imageModeSelected.value.indexOf(filepath)
+  if (idx >= 0) {
+    imageModeSelected.value.splice(idx, 1)
+  } else {
+    if (imageModeSelected.value.length >= 10) {
+      ElMessage.warning('最多选择10张图片')
+      return
+    }
+    imageModeSelected.value.push(filepath)
+  }
+}
+
+async function handleGenerateFromImages() {
+  if (!imageModeSelected.value.length) {
+    ElMessage.warning('请至少选择一张图片')
+    return
+  }
+  generating.value = true
+  result.value = null
+  syncStatus.value = 'idle'
+  elapsedSeconds.value = 0
+  genStage.value = 'planning'
+  elapsedTimer = setInterval(() => {
+    elapsedSeconds.value++
+    if (elapsedSeconds.value > 45) genStage.value = 'polishing'
+    else if (elapsedSeconds.value > 15) genStage.value = 'drafting'
+  }, 1000)
+
+  try {
+    const { data } = await articleApi.generateFromImages({
+      image_filepaths: imageModeSelected.value,
+      tone: imageModeTone.value,
+      topic_hint: imageModeTopic.value || undefined,
+    })
+    result.value = data
+    activeTab.value = 'preview'
+    await nextTick()
+    renderPreview()
+    ElMessage.success('文章生成完成')
+  } catch (err) {
+    ElMessage.error(err.response?.data?.detail || '生成失败，请重试')
+  } finally {
+    clearInterval(elapsedTimer)
+    generating.value = false
+  }
+}
+
+// Multi-draft system
+const DRAFTS_KEY = 'wechat_editor_drafts'
+const draftListVisible = ref(false)
+const drafts = ref([])
+
+const DEFAULT_DRAFTS = [
+  {
+    name: '案例1: 新品上市 - 名士K2智能直饮机',
+    data: {
+      content_type: '新品上市',
+      product_name: '名士K2智能直饮机',
+      key_points: ['2000G大流量', 'DPM动态蛋白纳滤技术', 'IoT智能管理', '一级水效节能40%'],
+      target_audience: '企业采购决策者',
+      tone: '专业、科技感',
+      image_requirement: '需要产品实拍图3张 + 功能示意图2张',
+    },
+  },
+  {
+    name: '案例2: 节日促销 - 618年中大促',
+    data: {
+      content_type: '节日促销',
+      occasion: '618年中大促',
+      promotion_detail: '名士系列全线8折，赠送3年滤芯',
+      deadline: '2026-06-18',
+      tone: '活泼、促销感',
+      image_requirement: '节日氛围图 + 产品图 + 促销海报',
+    },
+  },
+  {
+    name: '案例3: 健康科普 - 夏季如何科学补水',
+    data: {
+      content_type: '喝水知识科普',
+      topic: '夏季如何科学补水',
+      key_message: '保留矿物质的健康水更适合夏季补水',
+      product_association: '朴道DPM技术保留有益矿物质',
+      tone: '科普、亲和',
+      image_requirement: '科普插图 + 朴道产品图',
+    },
+  },
+]
+
+function loadDrafts() {
+  try {
+    const saved = localStorage.getItem(DRAFTS_KEY)
+    drafts.value = saved ? JSON.parse(saved) : []
+  } catch {
+    drafts.value = []
+  }
+  // First visit: seed with default examples
+  if (!localStorage.getItem(DRAFTS_KEY)) {
+    drafts.value = DEFAULT_DRAFTS.map(d => ({
+      ...d,
+      savedAt: new Date().toLocaleString(),
+    }))
+    saveDraftsToStorage()
+  }
+}
+
+function saveDraftsToStorage() {
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts.value))
+}
+
+function saveDraft() {
+  const name = form.value.product_name || form.value.topic || form.value.occasion || form.value.content_type
+  const draftName = `${form.value.content_type} - ${name}`
+  const existing = drafts.value.findIndex(d => d.name === draftName)
+  const entry = {
+    name: draftName,
+    data: { ...form.value },
+    savedAt: new Date().toLocaleString(),
+  }
+  if (existing >= 0) {
+    drafts.value[existing] = entry
+  } else {
+    drafts.value.unshift(entry)
+  }
+  saveDraftsToStorage()
+  ElMessage.success(`草稿"${draftName}"已保存`)
+}
+
+function loadDraft(index) {
+  const draft = drafts.value[index]
+  if (!draft) return
+  const data = draft.data
+  Object.keys(data).forEach(k => {
+    if (k in form.value) form.value[k] = data[k]
+  })
+  draftListVisible.value = false
+  ElMessage.success(`已加载草稿"${draft.name}"`)
+}
+
+function removeDraft(index) {
+  drafts.value.splice(index, 1)
+  saveDraftsToStorage()
+  ElMessage.success('草稿已删除')
+}
+
+// Auto-save current form as draft every 5 seconds
+let autoSaveTimer = null
+watch(form, () => {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => {
+    const name = form.value.product_name || form.value.topic || form.value.occasion || '未命名'
+    const draftName = `[自动] ${form.value.content_type} - ${name}`
+    const existing = drafts.value.findIndex(d => d.name === draftName)
+    const entry = {
+      name: draftName,
+      data: { ...form.value },
+      savedAt: new Date().toLocaleString(),
+    }
+    if (existing >= 0) {
+      drafts.value[existing] = entry
+    } else {
+      drafts.value.unshift(entry)
+    }
+    // Keep max 10 auto-saved drafts
+    if (drafts.value.length > 10) {
+      const autoDrafts = drafts.value.filter(d => d.name.startsWith('[自动]'))
+      if (autoDrafts.length > 5) {
+        const oldest = autoDrafts[autoDrafts.length - 1]
+        const idx = drafts.value.indexOf(oldest)
+        if (idx >= 0) drafts.value.splice(idx, 1)
+      }
+    }
+    saveDraftsToStorage()
+  }, 5000)
+}, { deep: true })
+
+// Image picker
+const pickerVisible = ref(false)
+const pickerSearch = ref('')
+const pickerAssets = ref([])
+const pickerSelected = ref(null)
+const pickerTargetIdx = ref(-1)
+
+const filteredPickerAssets = computed(() => {
+  if (!pickerSearch.value) return pickerAssets.value
+  const q = pickerSearch.value.toLowerCase()
+  return pickerAssets.value.filter(a =>
+    a.filename.toLowerCase().includes(q) ||
+    (a.keywords || '').toLowerCase().includes(q) ||
+    a.category.toLowerCase().includes(q)
+  )
+})
+
+async function openImagePicker(idx) {
+  pickerTargetIdx.value = idx
+  pickerSelected.value = null
+  pickerSearch.value = ''
+  pickerVisible.value = true
+  try {
+    const { data } = await assetApi.list({})
+    pickerAssets.value = (data.items || []).filter(a => a.file_type === 'image')
+  } catch {
+    pickerAssets.value = []
+  }
+}
+
+// Drag-and-drop image reordering
+const dragIndex = ref(-1)
+
+function onDragStart(e, idx) {
+  dragIndex.value = idx
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', String(idx))
+}
+
+function onDragOver(e, idx) {
+  if (dragIndex.value === idx) return
+  e.dataTransfer.dropEffect = 'move'
+}
+
+function onDrop(e, targetIdx) {
+  const sourceIdx = dragIndex.value
+  if (sourceIdx < 0 || sourceIdx === targetIdx) return
+
+  // Swap in images array
+  const imgs = result.value.images
+  const temp = imgs[sourceIdx]
+  imgs[sourceIdx] = imgs[targetIdx]
+  imgs[targetIdx] = temp
+
+  // Swap the corresponding img tags in HTML
+  const srcImgs = result.value.html_output.match(/<img[^>]*>/g) || []
+  if (srcImgs[sourceIdx] && srcImgs[targetIdx]) {
+    result.value.html_output = result.value.html_output
+      .replace(srcImgs[sourceIdx], '__SWAP_TEMP__')
+      .replace(srcImgs[targetIdx], srcImgs[sourceIdx])
+      .replace('__SWAP_TEMP__', srcImgs[targetIdx])
+  }
+
+  nextTick(() => renderPreview())
+}
+
+function onDragEnd() {
+  dragIndex.value = -1
+}
+
+function confirmReplaceImage() {
+  if (pickerSelected.value === null || pickerTargetIdx.value < 0) return
+  const asset = pickerAssets.value.find(a => a.id === pickerSelected.value)
+  if (!asset) return
+
+  const img = result.value.images[pickerTargetIdx.value]
+  const oldSrc = img.source
+  const newSrc = `/api/assets/serve/${asset.filepath}`
+
+  // Replace in images array
+  img.source = newSrc
+  img.filename = asset.filename
+  img.alt_text = asset.filename
+
+  // Replace in HTML
+  result.value.html_output = result.value.html_output.replace(oldSrc, newSrc)
+
+  // Re-render preview
+  nextTick(() => renderPreview())
+
+  pickerVisible.value = false
+  ElMessage.success('配图已替换')
+}
 
 const showProductFields = computed(() => {
   return ['新品上市', '装机案例', '获奖推送', '营销案例'].includes(form.value.content_type)
@@ -302,6 +813,10 @@ watch(() => form.value.content_type, (val) => {
   form.value.template_id = autoTemplate[val] || ''
   const autoTone = { '新品上市': '专业、科技感', '节日促销': '活泼、促销感', '喝水知识科普': '科普、亲和', '装机案例': '商务、严谨', '获奖推送': '商务、严谨', '营销案例': '商务、严谨' }
   form.value.tone = autoTone[val] || '专业、科技感'
+})
+
+watch(createMode, (mode) => {
+  if (mode === 'image') loadImageAssets()
 })
 
 function addPoint() {
@@ -320,6 +835,13 @@ async function handleGenerate() {
   generating.value = true
   result.value = null
   syncStatus.value = 'idle'
+  elapsedSeconds.value = 0
+  genStage.value = 'planning'
+  elapsedTimer = setInterval(() => {
+    elapsedSeconds.value++
+    if (elapsedSeconds.value > 45) genStage.value = 'polishing'
+    else if (elapsedSeconds.value > 15) genStage.value = 'drafting'
+  }, 1000)
 
   try {
     const payload = { ...form.value }
@@ -338,6 +860,7 @@ async function handleGenerate() {
   } catch (err) {
     ElMessage.error(err.response?.data?.detail || '生成失败，请重试')
   } finally {
+    clearInterval(elapsedTimer)
     generating.value = false
   }
 }
@@ -356,6 +879,17 @@ function renderPreview() {
     `)
     doc.close()
   }
+}
+
+async function openVisualEditor() {
+  if (!result.value) return
+  sessionStorage.setItem('editor_article', JSON.stringify({
+    article_title: result.value.article_title,
+    call_to_action: result.value.call_to_action,
+    html_output: result.value.html_output,
+    history_id: result.value.history_id,
+  }))
+  window.open('/editor', '_blank')
 }
 
 async function copyHtml() {
@@ -395,6 +929,7 @@ async function syncToWechat() {
     await wechatApi.sync({
       title: result.value.article_title,
       html_output: result.value.html_output,
+      history_id: result.value.history_id,
     })
     syncStatus.value = 'synced'
     ElMessage.success('已同步到公众号草稿箱')
@@ -412,6 +947,10 @@ async function loadTemplates() {
 }
 
 loadTemplates()
+
+onMounted(() => {
+  loadDrafts()
+})
 </script>
 
 <style scoped>
@@ -457,10 +996,93 @@ loadTemplates()
   white-space: pre-wrap;
   word-break: break-all;
 }
+.markdown-editor {
+  width: 100%;
+  min-height: 400px;
+  resize: vertical;
+  font-family: monospace;
+  outline: none;
+  border: none;
+}
+.markdown-editor:focus {
+  background: #2d2d2d;
+}
 .result-meta {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+}
+.image-slot {
+  cursor: grab;
+  position: relative;
+  transition: transform 0.15s, opacity 0.15s;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+.image-slot:hover {
+  border-color: #e0e0e0;
+}
+.image-slot.dragging {
+  opacity: 0.4;
+  border-color: #0066CC;
+}
+.drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  background: rgba(0,0,0,0.4);
+  color: #fff;
+  border-radius: 3px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 1;
+}
+.picker-item {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 4px;
+  transition: border-color 0.15s;
+}
+.picker-item:hover {
+  border-color: #0066CC;
+}
+.picker-item.selected {
+  border-color: #0066CC;
+  background: #F0F7FF;
+}
+.image-mode-item {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 2px;
+  transition: border-color 0.15s;
+}
+.image-mode-item:hover {
+  border-color: #e0e0e0;
+}
+.image-mode-item.selected {
+  border-color: #0066CC;
+  background: #F0F7FF;
+}
+.image-mode-overlay {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  background: rgba(255,255,255,0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 </style>

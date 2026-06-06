@@ -33,8 +33,6 @@ PRODUCT_KEYWORDS = {
 }
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
-VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".wmv"}
-DOC_EXTENSIONS = {".pdf", ".doc", ".docx", ".md", ".txt"}
 
 
 def _detect_category(rel_path: str) -> str:
@@ -67,10 +65,6 @@ def _detect_file_type(filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext in IMAGE_EXTENSIONS:
         return "image"
-    if ext in VIDEO_EXTENSIONS:
-        return "video"
-    if ext in DOC_EXTENSIONS:
-        return "document"
     return "other"
 
 
@@ -88,10 +82,18 @@ async def scan_assets():
             continue
 
         rel_path = str(filepath.relative_to(assets_dir)).replace("\\", "/")
+
+        # Skip previously deleted assets
+        from app.models.database import is_filepath_deleted
+        if await is_filepath_deleted(rel_path):
+            continue
+
         category = _detect_category(rel_path)
         sub_category = _detect_sub_category(rel_path)
         keywords = _detect_keywords(filepath.name)
         file_type = _detect_file_type(filepath.name)
+        if file_type != "image":
+            continue
         file_size = filepath.stat().st_size
 
         await upsert_asset({
@@ -112,7 +114,20 @@ async def scan_assets():
 async def init_app():
     await init_db()
     await init_sensitive_words()
+    # Clean up non-image assets
+    from app.models.database import get_db
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM assets WHERE file_type != 'image'")
+        await db.commit()
+    finally:
+        await db.close()
     await scan_assets()
+    # Build RAG knowledge base
+    from app.core.knowledge_base import build_knowledge_base
+    build_knowledge_base()
+
+    # Image descriptions built lazily on first use (see image_descriptor.py)
 
 
 if __name__ == "__main__":
