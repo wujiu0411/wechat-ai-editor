@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: ./backend
+    container_name: wechat-ai-editor
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
+      - ./backend/assets:/app/assets:ro
+    environment:
+      - LLM_API_BASE=${LLM_API_BASE:-http://8.145.39.17:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-glm-5.1-w8a8}
+      - WECHAT_APP_ID=${WECHAT_APP_ID}
+      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://wechat-ai-editor-hjh.vercel.app}
+    restart: unless-stopped
