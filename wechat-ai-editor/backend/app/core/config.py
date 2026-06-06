@@ -16,7 +16,7 @@ class Settings:
     ARTICLE_MIN_WORDS: int = int(os.getenv("ARTICLE_MIN_WORDS", "500"))
     ARTICLE_MAX_WORDS: int = int(os.getenv("ARTICLE_MAX_WORDS", "1500"))
     GENERATION_TIMEOUT: int = int(os.getenv("GENERATION_TIMEOUT", "120"))
-    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS", "*") != "*" else ["*"]
+    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "https://wechat-ai-editor-hjh.vercel.app").split(",")
     WECHAT_APP_ID: str = os.getenv("WECHAT_APP_ID", "")
     WECHAT_APP_SECRET: str = os.getenv("WECHAT_APP_SECRET", "")
 
