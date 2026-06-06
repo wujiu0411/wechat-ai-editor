@@ -1,0 +1,5 @@
+*.pdf
+*.zip
+node_modules/
+backend/assets/
+dist/
