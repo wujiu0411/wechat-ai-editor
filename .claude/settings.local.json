@@ -73,7 +73,11 @@
       "Bash(chmod +x *)",
       "Bash(bash aliyun-package.sh)",
       "Bash(tar -tzf /tmp/backend-deploy.tar.gz)",
-      "Bash(docker build *)"
+      "Bash(docker build *)",
+      "Bash(journalctl -u wechat-ai -n 50 --no-pager)",
+      "Bash(systemctl status *)",
+      "Bash(ls /)",
+      "Bash(find / -maxdepth 2 -name \"backend\" -type d)"
     ]
   }
 }

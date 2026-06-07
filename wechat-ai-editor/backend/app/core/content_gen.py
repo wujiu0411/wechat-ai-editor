@@ -60,6 +60,18 @@ async def generate_article(params: dict) -> dict:
 
     article_data = _parse_llm_response(raw_response)
 
+    # Fix: if content field is nested JSON (e.g. {"title":..., "content":...}), extract inner content
+    content_text = article_data.get("content", "")
+    if content_text.strip().startswith("{"):
+        try:
+            nested = json.loads(content_text)
+            if "content" in nested:
+                article_data["content"] = nested["content"]
+            if "title" in nested and not article_data.get("title"):
+                article_data["title"] = nested["title"]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     image_positions = _extract_image_positions(article_data.get("content", ""))
 
     return {

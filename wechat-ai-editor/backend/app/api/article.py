@@ -340,7 +340,7 @@ async def create_article_v2(input_data: ArticleInput):
 
 async def _gather_asset_context_v2(params: dict) -> str:
     product_name = params.get("product_name", "")
-    key_points = params.get("key_points", [])
+    key_points = params.get("key_points") or []
     topic = params.get("topic", "")
     search_terms = [product_name] + key_points + [topic]
     search_terms = [t for t in search_terms if t]
