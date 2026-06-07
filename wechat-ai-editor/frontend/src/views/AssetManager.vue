@@ -42,7 +42,7 @@
               <el-checkbox :model-value="selectedIds.includes(asset.id)" @change="toggleSelect(asset.id)" />
             </div>
             <div class="asset-thumb">
-              <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`" :alt="asset.filename" />
+              <img v-if="asset.file_type === 'image'" :src="assetUrl(asset.filepath)" :alt="asset.filename" />
               <el-icon v-else :size="48" color="#ccc"><Document /></el-icon>
             </div>
             <div class="asset-info">
@@ -107,7 +107,7 @@
         <!-- Normal preview mode -->
         <template v-if="!editMode && !cropMode">
           <div class="preview-body" style="max-height:60vh;overflow-y:auto">
-            <img v-if="previewAssetData.file_type === 'image'" :src="`/api/assets/serve/${previewAssetData.filepath}`" style="max-width:100%;display:block;margin:0 auto" />
+            <img v-if="previewAssetData.file_type === 'image'" :src="assetUrl(previewAssetData.filepath)" style="max-width:100%;display:block;margin:0 auto" />
             <div v-else style="text-align:center;padding:60px">
               <el-icon :size="80" color="#ccc"><Document /></el-icon>
               <p style="margin-top:12px;color:#666">{{ previewAssetData.filename }}</p>
@@ -152,7 +152,7 @@
             <!-- Left: Full image with split lines -->
             <div style="flex:1;text-align:center">
               <div class="crop-stage" ref="cropStageEl" @click="onCropStageClick">
-                <img :src="`/api/assets/serve/${previewAssetData.filepath}`"
+                <img :src="assetUrl(previewAssetData.filepath)"
                      style="max-width:100%;display:block"
                      @load="onCropImgLoad" />
                 <div v-for="(l, i) in cropLines" :key="'l'+i"
@@ -219,6 +219,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { assetApi, articleApi } from '../api'
+import { assetUrl } from '../utils/assetUrl.js'
 
 const assets = ref([])
 const categories = ref([])

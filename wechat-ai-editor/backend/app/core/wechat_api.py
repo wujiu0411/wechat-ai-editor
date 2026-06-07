@@ -206,8 +206,8 @@ wechat = WeChatAPI()
 
 def _find_image_file(src: str) -> Path | None:
     """根据HTML中的图片src查找本地文件"""
-    # Strip API prefix if present: /api/assets/serve/xxx -> xxx
-    clean = src.replace("/api/assets/serve/", "").lstrip("./")
+    # Strip URL prefix: /api/assets/serve/xxx or http://host/api/assets/serve/xxx -> xxx
+    clean = src.split("/api/assets/serve/")[-1].lstrip("./")
     for base_dir in [Path(settings.UPLOAD_DIR), Path(settings.ASSETS_DIR)]:
         file_path = base_dir / clean
         if file_path.exists():

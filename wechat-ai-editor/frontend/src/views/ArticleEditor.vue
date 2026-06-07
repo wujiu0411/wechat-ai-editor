@@ -100,7 +100,7 @@
         <el-row :gutter="8">
           <el-col v-for="asset in filteredPickerAssets" :key="asset.id" :span="6" style="margin-bottom:8px">
             <div class="picker-item" :class="{ selected: pickerSelected === asset.id }" @click="pickerSelected = asset.id">
-              <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`"
+              <img v-if="asset.file_type === 'image'" :src="assetUrl(asset.filepath)"
                    style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
               <p style="font-size:11px;color:#666;margin-top:2px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ asset.filename }}</p>
             </div>
@@ -120,6 +120,7 @@ import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { assetApi, historyApi } from '../api'
+import { assetUrl } from '../utils/assetUrl.js'
 
 const router = useRouter()
 
@@ -269,7 +270,7 @@ function confirmBlockImageReplace() {
   if (pickerSelected.value === null || pickerTargetBlockIdx.value < 0) return
   const asset = pickerAssets.value.find(a => a.id === pickerSelected.value)
   if (!asset) return
-  blocks.value[pickerTargetBlockIdx.value].src = `/api/assets/serve/${asset.filepath}`
+  blocks.value[pickerTargetBlockIdx.value].src = assetUrl(asset.filepath)
   blocks.value[pickerTargetBlockIdx.value].alt = asset.filename
   pickerVisible.value = false
   buildAndRenderPreview()

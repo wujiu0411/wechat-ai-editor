@@ -108,7 +108,7 @@
         <el-row :gutter="8">
           <el-col v-for="asset in filteredPickerAssets" :key="asset.id" :span="6" style="margin-bottom:8px">
             <div class="picker-item" :class="{ selected: pickerSelected === asset.id }" @click="pickerSelected = asset.id">
-              <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`" style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
+              <img v-if="asset.file_type === 'image'" :src="assetUrl(asset.filepath)" style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
               <div v-else style="width:100%;height:100px;background:#f5f5f5;border-radius:4px;display:flex;align-items:center;justify-content:center">
                 <el-icon :size="32" color="#ccc"><Document /></el-icon>
               </div>
@@ -129,6 +129,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { historyApi, wechatApi, assetApi } from '../api'
+import { assetUrl, fixHtmlImages } from '../utils/assetUrl.js'
 
 const items = ref([])
 const total = ref(0)
@@ -205,13 +206,14 @@ function viewHtml(row) {
 function renderDialogPreview() {
   if (dialogFrame.value && currentItem.value) {
     const doc = dialogFrame.value.contentDocument
+    const html = fixHtmlImages(currentItem.value.html_output)
     doc.open()
     doc.write(`
       <html><head>
         <meta charset="utf-8">
         <style>body{margin:0;padding:0;background:#f5f5f5;display:flex;justify-content:center;}</style>
       </head><body>
-        ${currentItem.value.html_output}
+        ${html}
       </body></html>
     `)
     doc.close()
@@ -232,7 +234,7 @@ function openVisualEditor() {
   sessionStorage.setItem('editor_article', JSON.stringify({
     article_title: currentItem.value.article_title,
     call_to_action: currentItem.value.seo_keywords?.length ? '点击阅读原文了解更多' : '点击阅读原文了解更多',
-    html_output: currentItem.value.html_output,
+    html_output: fixHtmlImages(currentItem.value.html_output),
     id: currentItem.value.id,
   }))
   window.open('/editor', '_blank')
@@ -340,7 +342,7 @@ async function confirmReplaceImage() {
   if (!imgs[pickerTargetIdx.value]) return
 
   const oldSrc = imgs[pickerTargetIdx.value].source
-  const newSrc = `/api/assets/serve/${asset.filepath}`
+  const newSrc = assetUrl(asset.filepath)
 
   imgs[pickerTargetIdx.value].source = newSrc
   imgs[pickerTargetIdx.value].filename = asset.filename

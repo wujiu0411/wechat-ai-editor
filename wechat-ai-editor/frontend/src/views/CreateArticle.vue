@@ -186,7 +186,7 @@
               <el-row :gutter="6">
                 <el-col v-for="asset in filteredImageAssets" :key="asset.id" :span="8" style="margin-bottom:6px">
                   <div class="image-mode-item" :class="{ selected: imageModeSelected.includes(asset.filepath) }">
-                    <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`"
+                    <img v-if="asset.file_type === 'image'" :src="assetUrl(asset.filepath)"
                          style="width:100%;height:80px;object-fit:cover;border-radius:4px;cursor:pointer"
                          @click="previewImageAsset(asset)" />
                     <div class="image-mode-overlay" @click.stop="toggleImageSelect(asset.filepath)">
@@ -408,7 +408,7 @@
     <!-- Image Preview Dialog (for creation mode) -->
     <el-dialog v-model="imagePreviewVisible" title="图片预览" width="500px" destroy-on-close>
       <div v-if="imagePreviewAsset" style="max-height:65vh;overflow-y:auto;text-align:center">
-        <img :src="`/api/assets/serve/${imagePreviewAsset.filepath}`"
+        <img :src="assetUrl(imagePreviewAsset.filepath)"
              style="max-width:100%;display:block" />
         <el-descriptions :column="1" border size="small" style="margin-top:12px">
           <el-descriptions-item label="文件名">{{ imagePreviewAsset.filename }}</el-descriptions-item>
@@ -434,7 +434,7 @@
         <el-row :gutter="8">
           <el-col v-for="asset in filteredPickerAssets" :key="asset.id" :span="6" style="margin-bottom:8px">
             <div class="picker-item" :class="{ selected: pickerSelected === asset.id }" @click="pickerSelected = asset.id">
-              <img v-if="asset.file_type === 'image'" :src="`/api/assets/serve/${asset.filepath}`" style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
+              <img v-if="asset.file_type === 'image'" :src="assetUrl(asset.filepath)" style="width:100%;height:100px;object-fit:cover;border-radius:4px" />
               <div v-else style="width:100%;height:100px;background:#f5f5f5;border-radius:4px;display:flex;align-items:center;justify-content:center">
                 <el-icon :size="32" color="#ccc"><Document /></el-icon>
               </div>
@@ -455,6 +455,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { articleApi, templateApi, wechatApi, assetApi } from '../api'
+import { assetUrl, fixHtmlImages } from '../utils/assetUrl.js'
 
 const form = ref({
   content_type: '新品上市',
@@ -783,7 +784,7 @@ function confirmReplaceImage() {
 
   const img = result.value.images[pickerTargetIdx.value]
   const oldSrc = img.source
-  const newSrc = `/api/assets/serve/${asset.filepath}`
+  const newSrc = assetUrl(asset.filepath)
 
   // Replace in images array
   img.source = newSrc
@@ -868,13 +869,14 @@ async function handleGenerate() {
 function renderPreview() {
   if (previewFrame.value && result.value) {
     const doc = previewFrame.value.contentDocument
+    const html = fixHtmlImages(result.value.html_output)
     doc.open()
     doc.write(`
       <html><head>
         <meta charset="utf-8">
         <style>body{margin:0;padding:0;background:#f5f5f5;display:flex;justify-content:center;}</style>
       </head><body>
-        ${result.value.html_output}
+        ${html}
       </body></html>
     `)
     doc.close()
@@ -886,7 +888,7 @@ async function openVisualEditor() {
   sessionStorage.setItem('editor_article', JSON.stringify({
     article_title: result.value.article_title,
     call_to_action: result.value.call_to_action,
-    html_output: result.value.html_output,
+    html_output: fixHtmlImages(result.value.html_output),
     history_id: result.value.history_id,
   }))
   window.open('/editor', '_blank')
